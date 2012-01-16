@@ -4,8 +4,9 @@
 	
 	<rm:locator pattern="^org\.eclipse\.emf\.xcore\.releng(?:\..+)?$" searchPathRef="releng" />
 	<rm:locator pattern="^org\.eclipse\.emf\.xcore\.build(?:\..+)?$" searchPathRef="releng" />
-	<rm:locator pattern="^org\.eclipse\.emf\.xcore\.tests(?:\..+)?$" searchPathRef="xcore.test" />
-	<rm:locator pattern="^org\.eclipse\.emf\.xcore(?:\..+)?$" searchPathRef="xcore" />
+	<rm:locator pattern="^org\.eclipse\.emf\.ecore\.xcore(?:\..+)?$" searchPathRef="xcore" />
+	<rm:locator pattern="^org\.eclipse\.emf\.test\.ecore\.xcore(?:\..+)?$" searchPathRef="xcore.test" />
+	
 	<rm:locator pattern="^org\.eclipse\.test$" searchPathRef="eclipse.test" />
 	<rm:locator pattern="^org\.eclipse\.ant\.optional\.junit$" searchPathRef="eclipse.test" />
 	
@@ -46,8 +47,6 @@
 				<bc:propertyRef key="buckminster.component" />
 			</rm:uri>
 		</rm:provider>
-	</rm:searchPath>
-	<rm:searchPath name="releng">
 		<rm:provider componentTypes="eclipse.feature" readerType="local" mutable="false">
 			<rm:uri format="{0}/{1}-feature">
 				<bc:propertyRef key="releng.checkout.location" />
