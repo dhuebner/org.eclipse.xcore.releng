@@ -5,6 +5,8 @@
 	<cs:dependencies>
 		<cs:dependency name="org.eclipse.emf.xcore.releng"
 			componentType="buckminster" />
+		<cs:dependency name="org.eclipse.emf.test.ecore.xcore"
+			componentType="eclipse.feature" />
 	</cs:dependencies>
 
 
