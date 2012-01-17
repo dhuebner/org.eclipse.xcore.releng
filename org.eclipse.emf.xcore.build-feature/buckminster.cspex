@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <cs:cspecExtension xmlns:com="http://www.eclipse.org/buckminster/Common-1.0"
 	xmlns:cs="http://www.eclipse.org/buckminster/CSpec-1.0">
+
 	<cs:dependencies>
 		<cs:dependency name="org.eclipse.emf.xcore.releng"
 			componentType="buckminster" />
 	</cs:dependencies>
+
 
 	<cs:actions>
 		<cs:private name="site.tp" actor="ant">
@@ -29,38 +31,57 @@
 			<cs:products alias="output" base="${buckminster.output}/zips/" />
 		</cs:public>
 
-
 		<cs:public name="package.emf-xcore-SDK" actor="ant">
 			<cs:actorProperties>
 				<cs:property key="buildFile" value="packaging.ant" />
 				<cs:property key="targets" value="package.ius" />
 			</cs:actorProperties>
 			<cs:properties>
-				<cs:property key="package.name" value="emf-xsd-SDK" />
+				<cs:property key="content.ius"
+					value="org.eclipse.emf.ecore.xcore.sdk.feature.group" />
+				<cs:property key="package.name" value="emf-xcore-SDK" />
 			</cs:properties>
 			<cs:prerequisites>
-				<cs:attribute name="emf.license.files" alias="license.files" />
-				<cs:attribute name="package.emf-xcore-Update" alias="updatesite" />
+				<cs:attribute name="site.p2" alias="repository" />
+				<cs:attribute name="site.tp" alias="target.platform.repository" />
 			</cs:prerequisites>
 			<cs:products alias="output" base="${buckminster.output}/zips/" />
 		</cs:public>
 
 
-		<cs:private name="emf.license.files" actor="ant">
+		<cs:public name="package.emf-xcore-runtime" actor="ant">
 			<cs:actorProperties>
 				<cs:property key="buildFile" value="packaging.ant" />
-				<cs:property key="targets" value="install.ius" />
+				<cs:property key="targets" value="package.ius" />
 			</cs:actorProperties>
 			<cs:properties>
-				<cs:property key="ius" value="org.eclipse.emf.license_root" />
+				<cs:property key="content.ius"
+					value="org.eclipse.emf.ecore.xcore.feature.group" />
+				<cs:property key="package.name" value="emf-xcore-runtime" />
 			</cs:properties>
 			<cs:prerequisites>
-				<cs:attribute name="site.p2" alias="repositories" />
+				<cs:attribute name="site.p2" alias="repository" />
 				<cs:attribute name="site.tp" alias="target.platform.repository" />
 			</cs:prerequisites>
-			<cs:products alias="output"
-				base="${buckminster.temp}/emf.license.files/" />
-		</cs:private>
+			<cs:products alias="output" base="${buckminster.output}/zips/" />
+		</cs:public>
+
+		<cs:public name="package.emf-xcore-ui" actor="ant">
+			<cs:actorProperties>
+				<cs:property key="buildFile" value="packaging.ant" />
+				<cs:property key="targets" value="package.ius" />
+			</cs:actorProperties>
+			<cs:properties>
+				<cs:property key="content.ius"
+					value="org.eclipse.emf.ecore.xcore.ui.feature.group" />
+				<cs:property key="package.name" value="emf-xcore-runtime" />
+			</cs:properties>
+			<cs:prerequisites>
+				<cs:attribute name="site.p2" alias="repository" />
+				<cs:attribute name="site.tp" alias="target.platform.repository" />
+			</cs:prerequisites>
+			<cs:products alias="output" base="${buckminster.output}/zips/" />
+		</cs:public>
 
 	</cs:actions>
 
@@ -68,6 +89,8 @@
 		<cs:public name="build">
 			<cs:attribute name="package.emf-xcore-Update" />
 			<cs:attribute name="package.emf-xcore-SDK" />
+			<cs:attribute name="package.emf-xcore-runtime" />
+			<cs:attribute name="package.emf-xcore-ui" />
 		</cs:public>
 	</cs:groups>
 </cs:cspecExtension>

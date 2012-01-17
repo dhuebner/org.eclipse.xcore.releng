@@ -13,25 +13,12 @@
 		<property name="build.id" value="" />
 		<property name="hudson.build.id" value="" />
 
-		<!-- take care about trailing slash in ${xcore.p2.repository} -->
-		<condition property="xcore.properties.url.suffix" value="../promote.properties" else="/../promote.properties">
-			<matches string="${xcore.p2.repository}" pattern="^.*/$" />
-		</condition>
-		<!-- Load  xcore properties -->
-		<property prefix="xcore.saved." url="${xcore.p2.repository}${xcore.properties.url.suffix}" />
-
 		<propertyfile file="${promoter.properties.file}" comment="Promoter script properties">
 			<entry key="java.home" value="${java.home}" />
 			<entry key="eclipse.home" value="${eclipse.home}" />
 			<entry key="build.id" value="${build.id}" />
 			<entry key="hudson.build.id" value="${hudson.build.id}" />
-			<entry key="xcore.build.path" value="${xcore.saved.xcore.build.path}" />
 		</propertyfile>
-
-		<!-- diagnostics
-		<property environment="env." />
-		<echoproperties destfile="${promoter.setup.directory}/all.properties" />
-		-->
 	</target>
 
 	<target name="-locate.launcher.jar" unless="launcher.jar">
@@ -90,8 +77,8 @@
 
 	<target name="publish.build">
 		<fail message="build.root property must be defined" unless="build.root" />
-		<property file="${build.root}/${publisher.properties.file.name}" />
-		<property name="property.file.location" location="${build.root}/${promoter.properties.file.name}" />
+
+		<property name="property.file.location" location="${build.root}/archive/${promoter.properties.file.name}" />
 		<property name="property.load.prefix" value="saved." />
 
 		<antcall target="publish.build.stage.2" inheritall="true" />
@@ -117,7 +104,7 @@
 			<isset property="saved.java.home" />
 		</condition>
 		<tempfile property="publisher.workspace" prefix="workspace." destdir="${java.io.tmpdir}" />
-		<echo>Used launcher: ${launcher.jar}</echo>
+
 		<java jvm="${java.executable}" jar="${launcher.jar}" fork="true" failonerror="true">
 			<syspropertyset>
 				<propertyref builtin="commandline" />
@@ -126,8 +113,6 @@
 			</syspropertyset>
 			<arg value="-data" />
 			<arg value="${publisher.workspace}" />
-			<arg value="-configuration" />
-			<arg value="${publisher.workspace}/configuration" />
 			<arg value="-application" />
 			<arg value="org.eclipse.ant.core.antRunner" />
 			<arg value="-buildfile" />
@@ -163,33 +148,18 @@
 			</condition>
 		</fail>
 		<fail message="build.root property must be defined" unless="build.root" />
-		<property file="${build.root}/${publisher.properties.file.name}" />
+		<fail message="packages.base property must be defined" unless="packages.base" />
 		<fail message="downloads.area property must be defined" unless="downloads.area" />
 
 		<!-- defaults -->
-		<property name="version" value="0.7.0" />
-		<property name="packages.base" value="downloads" />
-		<property name="tests.base" value="test.results" />
-		<property name="javadoc.base" value="javadoc" />
+		<property name="version" value="0.0.0" />
 
-		<property name="packages.directory" location="${build.root}/${packages.base}" />
-		<property name="testresults.directory" location="${build.root}/${tests.base}" />
-		<property name="javadoc.directory" location="${build.root}/${javadoc.base}" />
+		<property name="packages.directory" location="${build.root}/archive/${packages.base}" />
 
 		<property name="build.drop.directory" location="${downloads.area}/downloads/drops/${version}/${saved.build.id}" />
-		<available file="${build.drop.directory}" type="dir" property="alreadyPromoted" />
-		<antcall target="publish" inheritall="true" />
-		<antcall target="echo-status" inheritall="true" />
-	</target>
 
-	<target name="publish" unless="alreadyPromoted">
-		<!-- will fail if already exists -->
+		<delete dir="${build.drop.directory}" />
 		<mkdir dir="${build.drop.directory}" />
-
-		<echo>Remove old  nightly builds</echo>
-		<antcall target="-cleanup.nightly">
-			<param name="working_dir" value="${downloads.area}/downloads/drops/${version}/" />
-		</antcall>
 
 		<!-- copy zip packages -->
 		<copy todir="${build.drop.directory}">
@@ -197,42 +167,12 @@
 				<filename name="*.zip" />
 			</fileset>
 		</copy>
-
-		<!-- copy and rename xcore artifacts-->
-		<copy todir="${build.drop.directory}">
-			<fileset dir="${downloads.area}/downloads/drops/${saved.xcore.build.path}/">
-				<include name="**/*" />
-				<exclude name="**/*.md5" />
-			</fileset>
-			<filtermapper>
-				<replaceregex pattern="(emft-xcore-.*)-[NMSR]\d{12}.zip" replace="\1-${saved.build.id}.zip" flags="gi" />
-			</filtermapper>
-		</copy>
-
 		<!-- genereate md5 checksums -->
-		<checksum algorithm="MD5" fileext=".md5" format="MD5SUM" forceoverwrite="true">
+		<checksum algorithm="MD5" fileext=".md5" format="MD5SUM">
 			<fileset dir="${build.drop.directory}" />
 		</checksum>
-
-		<echo file="${build.drop.directory}/xcore.version">used.xcore.version=${saved.xcore.build.path}</echo>
-
-		<!-- copy testresults -->
-		<mkdir dir="${build.drop.directory}/testresults" />
-		<copy todir="${build.drop.directory}/testresults">
-			<fileset dir="${testresults.directory}">
-				<filename name="**/*.xml" />
-			</fileset>
-		</copy>
-
-		<!-- if the build id starts with S or R build.stable property will be set -->
-		<condition property="build.stable" value="true">
-			<matches string="${saved.build.id}" pattern="[S|R](d)*" />
-		</condition>
-
-		<!-- strip the micro version and anything following it -->
-		<buckminster.substitute value="${version}" pattern="^(\d+\.\d+)\.\d+.*$" replacement="$$1" property="base.version" />
-
-		<antcall target="-publish.javadoc" inheritall="true" />
+		<!-- copy buildlog -->
+		<copy tofile="${build.drop.directory}/buildlog.txt" file="${build.root}/log" />
 
 		<fileset id="drop.resources" dir="${build.drop.directory}">
 			<or>
@@ -246,86 +186,61 @@
 			<reference refid="drop.resources" torefid="change.group.owner.resources" />
 		</antcall>
 
+		<!-- strip everything after the minor version -->
+		<buckminster.substitute value="${version}" pattern="^(\d+\.\d+).*$" replacement="$$1" property="base.version" />
 
 		<!-- setup composite.repository.base appropriate to the build type -->
-		<condition property="composite.repository.base" value="nightly">
-			<matches pattern="^N" string="${saved.build.id}" />
+		<condition property="composite.repository.base" value="${base.version}-I-builds">
+			<matches pattern="^I" string="${saved.build.id}" />
 		</condition>
-		<condition property="composite.repository.base" value="milestones/${saved.build.id}">
+		<condition property="composite.repository.base" value="${base.version}milestones">
 			<matches pattern="^[MS]" string="${saved.build.id}" />
 		</condition>
-		<condition property="composite.repository.base" value="releases/${saved.build.id}">
+		<condition property="composite.repository.base" value="${base.version}">
 			<matches pattern="^R" string="${saved.build.id}" />
 		</condition>
 
 		<antcall target="-publish.build.repository" inheritall="true" />
 	</target>
 
-	<target name="-cleanup.nightly" if="working_dir">
-		<property name="delete_pattern" value="N*" />
-		<property name="keep_count" value="4" />
-		<echo>Keep ${keep_count} most recent builds</echo>
-
-		<!-- add newest (sorted by name) folderst to keep.dirs.res_id resources collection -->
-		<resources id="keep.dirs.res_id">
-			<last count="${keep_count}">
-				<sort>
-					<dirset dir="${working_dir}" includes="${delete_pattern}" />
-					<name />
-				</sort>
-			</last>
-		</resources>
-
-		<!-- keep only last segment (flatten),
-						convert to comma separated string with trailing slash (regexpmapper)
-						 N201101012335/,N201101012336/-->
-		<pathconvert property="keep.dirs.paths" pathsep="," refid="keep.dirs.res_id">
-			<chainedmapper>
-				<flattenmapper />
-				<regexpmapper from="^(.*)$$" to="\1/" />
-			</chainedmapper>
-		</pathconvert>
-		<condition property="hasFoldersToKeep" value="true">
-			<not>
-				<equals arg1="${keep.dirs.paths}" arg2="" />
-			</not>
-		</condition>
-		<antcall target="-doDelete" inheritall="true" inheritrefs="true" />
-	</target>
-
-	<!-- recursive delete folders -->
-	<target name="-doDelete" if="hasFoldersToKeep">
-		<echo>Deleting all ${delete_pattern} but: ${keep.dirs.paths}</echo>
-		<delete includeemptydirs="true">
-			<fileset dir="${working_dir}" includes="${delete_pattern}/" excludes="${keep.dirs.paths}" />
-		</delete>
-	</target>
-
-
 	<target name="-publish.build.repository" if="composite.repository.base">
+		<fail message="repository.base property must be defined" unless="repository.base" />
 
 		<property name="composite.repository.directory" location="${downloads.area}/updates/${composite.repository.base}" />
 		<property name="composite.repository.url" value="file:/${composite.repository.directory}" />
-		<!-- 
-				without p2.composite.repository
-				<property name="build.repository.directory" location="${composite.repository.directory}/${saved.build.id}" />
-				 -->
-		<property name="build.repository.directory" location="${composite.repository.directory}" />
+		<property name="build.repository.directory" location="${composite.repository.directory}/${saved.build.id}" />
+		<property name="build.repository.template" location="${composite.repository.directory}/template" />
 
-		<delete dir="${build.repository.directory}/xcore2lang" />
-		<unzip dest="${build.repository.directory}/xcore2lang">
-			<fileset dir="${packages.directory}">
-				<filename name="*-Update*.zip" />
+		<delete dir="${build.repository.directory}" />
+		<mkdir dir="${build.repository.directory}" />
+
+		<!--
+			We seed the metadata repository with the repository references and the mirroring
+			information specified in the template
+		-->
+		<copy todir="${build.repository.directory}">
+			<fileset dir="${build.repository.template}">
+				<filename name="content.xml" />
 			</fileset>
-		</unzip>
+		</copy>
+		<p2.mirror>
+			<repository location="file:/${build.repository.directory}" kind="M" />
+			<!--
+				Seeding does not work for artifact repository - missing artifacts are reported.
+				Fortunately we can use the format attribute to obtain the same effect.
+			-->
+			<repository location="file:/${build.repository.directory}" kind="A" format="file:/${build.repository.template}" />
+			<source>
+				<repository location="file:/${build.root}/archive/${repository.base}" />
+			</source>
+		</p2.mirror>
 
-		<!--<p2.composite.repository destination="${composite.repository.url}">
+		<p2.composite.repository destination="${composite.repository.url}">
 			<add>
-				<repository location="${saved.build.id}/xcore2" />
+				<repository location="${saved.build.id}" />
 			</add>
-		</p2.composite.repository>-->
+		</p2.composite.repository>
 
-		<!-- change Group owner  -->
 		<fileset id="repository.resources" dir="${composite.repository.directory}">
 			<or>
 				<filename name="compositeContent.*" />
@@ -343,19 +258,5 @@
 		<chgrp group="${group.owner}" type="both" verbose="true">
 			<fileset refid="change.group.owner.resources" />
 		</chgrp>
-	</target>
-
-	<target name="-publish.javadoc" if="build.stable">
-		<!-- copy javadoc -->
-		<echo>Unzipping javadoc</echo>
-		<unzip dest="${downloads.area}/javadoc/${base.version}" overwrite="true">
-			<fileset dir="${javadoc.directory}">
-				<filename name="javadoc.zip" />
-			</fileset>
-		</unzip>
-	</target>
-
-	<target name="echo-status" if="alreadyPromoted">
-		<echo>Build ${saved.build.id} already promoted, nothing to do...</echo>
 	</target>
 </project>

@@ -2,13 +2,17 @@
 <project name="Packaging">
 	<target name="create.target.platform.metadata">
 		<buckminster.targetPlatformLocation property="target.platform.location" />
-		<property name="target.platform.repository" value="file:${sp:output}" />
+		<property name="target.platform.repository" value="file:/${sp:output}" />
 		<p2.publish.featuresAndBundles metadataRepository="${target.platform.repository}" source="${target.platform.location}" publishArtifacts="false" />
 		<buckminster.publishJRE metadataRepository="${target.platform.repository}" publishArtifacts="false" />
 	</target>
 
-	<target name="-define.package.name.stem">
+	<target name="-define.package.qualifier">
 		<property name="incubation.qualifier" value="" />
+		<!-- if the build id starts with S or R build.stable property will be set -->
+		<condition property="build.stable" value="true">
+			<matches string="${build.id}" pattern="[S|R](d)*" />
+		</condition>
 
 		<!-- if the build.alias is non-empty then use it in preference -->
 		<condition property="package.qualifier" value="${incubation.qualifier}-${build.alias}">
@@ -24,15 +28,33 @@
 				<length string="${build.id}" when="greater" length="0" />
 			</and>
 		</condition>
-
-		<property name="package.name.stem" value="${sp:output}/${package.name}${package.qualifier}" />
 	</target>
 
-	<target name="package.site" depends="-define.package.name.stem">
-		<mkdir dir="${sp:output}" />
+	<!-- Modify category xml (replace package qualifier) -->
+	<target name="-create.category.xml" depends="-define.package.qualifier">
+		<loadfile property="modifiedCategoryXml" srcFile="category.xml.template">
+			<filterchain>
+				<expandproperties />
+			</filterchain>
+		</loadfile>
+		<echo file="category.xml">${modifiedCategoryXml}</echo>
+	</target>
 
+
+	<target name="package.site" depends="-define.package.qualifier">
+		<mkdir dir="${sp:output}" />
 		<!-- create the desired ZIP file -->
-		<zip basedir="${sp:repository}" destfile="${package.name.stem}.zip" />
+		<zip basedir="${sp:repository}" destfile="${sp:output}/${package.name}${package.qualifier}.zip" />
+		<antcall target="-statistic.add" inheritall="true" />
+	</target>
+
+
+	<!-- Appends p2 download statistic data to the artifacts.xml-->
+	<target name="-statistic.add" if="build.stable">
+		<echo>Stable build ${build.id} - adding statistic data</echo>
+		<property name="repository.root" value="${sp:repository}" />
+		<property name="qualifier" value="${package.qualifier}" />
+		<ant antfile="statistics/statistics.ant" target="addStatistic" inheritall="true" />
 	</target>
 
 	<target name="-locate.launcher.jar" unless="launcher.jar">
@@ -48,92 +70,43 @@
 		</pathconvert>
 	</target>
 
-	<target name="-define.install.properties" depends="-locate.launcher.jar">
+	<target name="-define.common.properties" depends="-locate.launcher.jar">
 		<buckminster.targetPlatformLocation property="target.platform.location" />
-
-		<!--
-			Set the target platform bundle pool path to an empty value in case installation
-			of the target platform components is desired, otherwise set it to the target
-			platform location.
-			The target platform bundle pool path is used as a secondary bundle pool during
-			the installations. So if set to the location of the target platform, then all
-			components in the target platform appear to be already installed to the installation
-			process, and thus are not installed again. On the other hand if set to an empty
-			value then the components from the target platform don't appear to be installed,
-			and thus are installed along with the components produced by the build. 
-		-->
-		<condition property="target.platform.bundle.pool.path" value="">
-			<istrue value="${install.target.platform.dependencies}" />
-		</condition>
-		<property name="target.platform.bundle.pool.path" location="${target.platform.location}" />
-
-		<property name="bundle.pools.property.name" value="org.eclipse.equinox.p2.cache.extensions" />
-		<property name="install.features.property.name" value="org.eclipse.update.install.features" />
-
-		<!-- set default -->
-		<property name="install.features" value="true" />
-
-		<!-- default to empty values -->
-		<property name="fs:repositories" value="" />
-		<property name="fs:metadata.repositories" value="" />
-		<property name="fs:artifact.repositories" value="" />
-		<property name="fs:target.platform.repository" value="" />
-		<property name="fs:install.pools" value="" />
-
-		<!-- create a list of all possible metadata repositories -->
-		<pathconvert property="metadata.repositories" dirsep="/" pathsep=",">
-			<buckminster.valuepath value="${fs:repositories}" />
-			<buckminster.valuepath value="${fs:metadata.repositories}" />
-			<!-- this is a metadata repository generated for the artifacts in the target platform -->
-			<buckminster.valuepath value="${fs:target.platform.repository}" />
-			<map from="" to="file:" />
-		</pathconvert>
-
-		<!-- create a list of all possible artifact repositories -->
-		<pathconvert property="artifact.repositories" dirsep="/" pathsep=",">
-			<buckminster.valuepath value="${fs:repositories}" />
-			<buckminster.valuepath value="${fs:artifact.repositories}" />
-			<!-- this is the real target platform location -->
-			<path location="${target.platform.location}" />
-			<map from="" to="file:" />
-		</pathconvert>
+		<property name="target.platform.bundle.pool" value="file:/${target.platform.location}" />
 
 		<condition property="wildcard" value="&quot;*&quot;" else="*">
 			<os family="windows" />
 		</condition>
 	</target>
 
-	<target name="-install.ius" if="${install.ius.property}">
-		<loadresource property="install.ius">
-			<propertyresource name="${install.ius.property}" />
-		</loadresource>
-
-		<pathconvert property="bundle.pools" dirsep="/" pathsep="|" setonempty="false">
-			<path path="${default.bundle.pools}" />
-			<buckminster.valuepath value="${fs:install.pools}" />
-			<map from="" to="file:" />
-		</pathconvert>
-
-		<condition property="profile.properties" value="${bundle.pools.property.name}=${bundle.pools},${install.features.property.name}=${install.features}" else="${install.features.property.name}=${install.features}">
-			<isset property="bundle.pools" />
+	<target name="-install.prerequisite.ius" depends="-define.common.properties" if="prerequisite.ius">
+		<condition property="bundle.pools.for.prerequisites" value="${target.platform.bundle.pool}|file:/${sp:prerequisites.base}" else="${target.platform.bundle.pool}">
+			<isset property="sp:prerequisites.base" />
 		</condition>
+		<property name="bundle.pools.for.install" value="${target.platform.bundle.pool}|file:/${prerequisites.destination}" />
 
+		<delete dir="${prerequisites.destination}" />
+
+		<!--
+		  install the specified prerequisite IUs (which are not to be included
+		  in the final install) in a separate directory
+		-->
 		<java jar="${launcher.jar}" fork="true" failonerror="true">
 			<arg value="-consolelog" />
 			<arg value="-application" />
 			<arg value="org.eclipse.equinox.p2.director" />
+			<arg value="-repository" />
+			<arg value="file:/${sp:repository}" />
 			<arg value="-metadataRepository" />
-			<arg value="${metadata.repositories}" />
-			<arg value="-artifactRepository" />
-			<arg value="${artifact.repositories}" />
+			<arg value="file:/${sp:target.platform.repository}" />
 			<arg value="-destination" />
-			<arg value="${sp:output}" />
+			<arg value="${prerequisites.destination}" />
 			<arg value="-profile" />
-			<arg value="Install" />
+			<arg value="Prerequisites" />
 			<arg value="-profileproperties" />
-			<arg value="${profile.properties}" />
+			<arg value="org.eclipse.equinox.p2.cache.extensions=${bundle.pools.for.prerequisites},org.eclipse.update.install.features=true" />
 			<arg value="-installIU" />
-			<arg value="${install.ius}" />
+			<arg value="${prerequisite.ius}" />
 			<arg value="-p2.os" />
 			<arg value="${wildcard}" />
 			<arg value="-p2.ws" />
@@ -142,188 +115,280 @@
 			<arg value="${wildcard}" />
 		</java>
 
-		<!-- remove the p2 profile as this is not a real product -->
-		<delete dir="${sp:output}" includeEmptyDirs="true">
+		<!--
+		  remove the p2 metadata, as the prerequisites install location is only meant
+		  to be used as a secondary bundle pool during the install of the required IUs
+		-->
+		<delete dir="${prerequisites.destination}" includeEmptyDirs="true">
 			<include name="p2/**" />
-			<include name=".artifactlock/**" />
 		</delete>
 	</target>
 
-	<target name="install.ius" depends="-define.install.properties">
-		<delete dir="${sp:output}" />
+	<target name="-install.content.ius" depends="-install.prerequisite.ius">
+		<!-- this may have already been defined in the -install.prerequisite.ius target (if it ran) -->
+		<property name="bundle.pools.for.install" value="${target.platform.bundle.pool}" />
 
-		<!-- install the specified IUs -->
-		<antcall target="-install.ius">
-			<param name="install.ius.property" value="ius" />
-			<param name="default.bundle.pools" value="${target.platform.bundle.pool.path}" />
-		</antcall>
+		<delete dir="${install.destination}" />
 
-		<!-- install the specified target platform IUs -->
-		<antcall target="-install.ius">
-			<param name="install.ius.property" value="target.platform.ius" />
-			<param name="default.bundle.pools" value="" />
-		</antcall>
+		<!--
+		  install the required IUs, referencing the target plaform and potetially also the prerequisite
+		  install location as secondary bundle pools so that only the desired components are installed
+		  in the install destination directory
+		-->
+		<java jar="${launcher.jar}" fork="true" failonerror="true">
+			<arg value="-consolelog" />
+			<arg value="-application" />
+			<arg value="org.eclipse.equinox.p2.director" />
+			<arg value="-repository" />
+			<arg value="file:/${sp:repository}" />
+			<arg value="-metadataRepository" />
+			<arg value="file:/${sp:target.platform.repository}" />
+			<arg value="-destination" />
+			<arg value="${install.destination}" />
+			<arg value="-profile" />
+			<arg value="Install" />
+			<arg value="-profileproperties" />
+			<arg value="org.eclipse.equinox.p2.cache.extensions=${bundle.pools.for.install},org.eclipse.update.install.features=true" />
+			<arg value="-installIU" />
+			<arg value="${content.ius}" />
+			<arg value="-p2.os" />
+			<arg value="${wildcard}" />
+			<arg value="-p2.ws" />
+			<arg value="${wildcard}" />
+			<arg value="-p2.arch" />
+			<arg value="${wildcard}" />
+		</java>
+
+		<!-- remove the p2 metadata, so that the installation of target platform IUs is not confused -->
+		<delete dir="${install.destination}" includeEmptyDirs="true">
+			<include name="p2/**" />
+		</delete>
 	</target>
 
-	<target name="-appoint.single.install.pool" if="sp:install.pools">
-		<property name="gathered.pools.directory" location="${sp:install.pools}" />
+	<target name="-install.ius" depends="-install.content.ius" if="target.platform.ius">
+		<!--
+		  install the specified TP IUs
+		-->
+		<java jar="${launcher.jar}" fork="true" failonerror="true">
+			<arg value="-consolelog" />
+			<arg value="-application" />
+			<arg value="org.eclipse.equinox.p2.director" />
+			<arg value="-metadataRepository" />
+			<arg value="file:/${sp:target.platform.repository}" />
+			<arg value="-artifactRepository" />
+			<arg value="${target.platform.bundle.pool}" />
+			<arg value="-destination" />
+			<arg value="${install.destination}" />
+			<arg value="-profile" />
+			<arg value="Install" />
+			<arg value="-profileproperties" />
+			<arg value="org.eclipse.update.install.features=true" />
+			<arg value="-installIU" />
+			<arg value="${target.platform.ius}" />
+			<arg value="-p2.os" />
+			<arg value="${wildcard}" />
+			<arg value="-p2.ws" />
+			<arg value="${wildcard}" />
+			<arg value="-p2.arch" />
+			<arg value="${wildcard}" />
+		</java>
+
+		<!-- remove the p2 metadata, as they will never be used -->
+		<delete dir="${install.destination}" includeEmptyDirs="true">
+			<include name="p2/**" />
+		</delete>
 	</target>
 
-	<target name="-gather.install.pools" depends="-appoint.single.install.pool,-define.package.name.stem" unless="gathered.pools.directory">
-		<property name="gathered.pools.directory" location="${package.name.stem}" />
+	<target name="-define.properties.for.installation">
+		<property name="install.destination" location="${sp:output}" />
 
-		<delete dir="${gathered.pools.directory}" />
-		<mkdir dir="${gathered.pools.directory}" />
-
-		<!-- set default -->
-		<property name="fs:install.pools" value="" />
-
-		<buckminster.copy todir="${gathered.pools.directory}">
-			<buckminster.filesetgroup value="${fs:install.pools}" />
-		</buckminster.copy>
+		<property name="prerequisites.destination" location="${install.destination}-prerequisites" />
 	</target>
 
-	<target name="-define.empty.licese.files.resource.set" unless="sp:license.files">
-		<!-- this is intended to produce an empty zipfileset (cf. with the condition in the target) -->
-		<zipfileset dir="${basedir}" id="license.files">
-			<selector if="sp:license.files" />
-		</zipfileset>
+	<target name="install.ius" depends="-define.properties.for.installation,-install.ius">
+		<!-- cleanup -->
+		<delete dir="${prerequisites.destination}" />
 	</target>
 
-	<target name="-define.license.files.resource.set" depends="-define.empty.licese.files.resource.set" if="sp:license.files">
-		<!-- define a zipfileset containing all license files and specifying their location in the resulting zip file -->
-		<zipfileset id="license.files" dir="${sp:license.files}" prefix="${license.files.directory}" />
+	<target name="-define.properties.for.packaging">
+		<property name="temp.directory" location="${sp:output}/${package.name}-temp" />
+
+		<property name="install.directory.name" value="eclipse" />
+		<property name="install.destination" location="${temp.directory}/${install.directory.name}" />
+
+		<property name="prerequisites.destination" location="${temp.directory}/prerequisites" />
 	</target>
 
-	<target name="-define.package.ius.properties">
-		<!-- set defaults -->
-		<property name="top.directory" value="eclipse" />
-		<property name="license.files.directory" value="${top.directory}" />
-	</target>
+	<target name="package.ius" depends="-define.properties.for.packaging,-install.ius,-define.package.qualifier">
+		<!-- remove the p2 metadata, as they will never be used -->
+		<delete dir="${install.destination}" includeEmptyDirs="true">
+			<include name="artifacts.xml" />
+		</delete>
 
-	<target name="package.ius" depends="-define.package.ius.properties,-gather.install.pools,-define.license.files.resource.set">
-		<mkdir dir="${sp:output}" />
-
-		<zip destfile="${package.name.stem}.zip">
-			<zipfileset dir="${gathered.pools.directory}" prefix="${top.directory}">
-				<exclude name="artifacts.xml" />
-			</zipfileset>
-			<zipfileset refid="license.files" />
+		<!-- create the desired ZIP file -->
+		<zip basedir="${temp.directory}" destfile="${sp:output}/${package.name}${package.qualifier}.zip">
+			<include name="${install.directory.name}/**" />
 		</zip>
 
-		<!-- cleanup (the directory is present only if fs:install.pools appointed more than one install pool) -->
-		<delete dir="${package.name.stem}" />
+		<!-- cleanup -->
+		<delete dir="${temp.directory}" />
 	</target>
 
-	<target name="-define.package.models.properties">
-		<!-- set defaults -->
-		<property name="top.directory" value="models" />
-		<property name="license.files.directory" value="" />
-	</target>
+	<target name="package.models" depends="-define.common.properties,-define.package.qualifier">
+		<property name="temp.directory" location="${sp:output}/${package.name}-temp/" />
 
-	<target name="package.models" depends="-define.package.models.properties,-gather.install.pools,-define.license.files.resource.set">
-		<property name="plugins.directory" location="${gathered.pools.directory}/plugins" />
-		<property name="models.directory" location="${package.name.stem}/models" />
-		<property name="stamp.file.name" value=".stamp" />
+		<property name="install.destination" location="${temp.directory}/${top.directory}" />
+		<property name="bundle.pools.for.install" value="${target.platform.bundle.pool}" />
 
-		<delete dir="${models.directory}" />
+		<delete dir="${install.destination}" />
 
 		<!--
-			create a separate subdirectory of the models directory for each bundle found
-			in the plugins subdirectory of the gathered install pools directory
+		  install required IUs, referencing the target plaform as a secondary bundle pool
+		  so that only the desired components are installed in the install destination
+		  directory
+		-->
+		<java jar="${launcher.jar}" fork="true" failonerror="true">
+			<arg value="-consolelog" />
+			<arg value="-application" />
+			<arg value="org.eclipse.equinox.p2.director" />
+			<arg value="-repository" />
+			<arg value="file:/${sp:repository}" />
+			<arg value="-metadataRepository" />
+			<arg value="file:/${sp:target.platform.repository}" />
+			<arg value="-destination" />
+			<arg value="${install.destination}" />
+			<arg value="-profile" />
+			<arg value="Install" />
+			<arg value="-profileproperties" />
+			<arg value="org.eclipse.equinox.p2.cache.extensions=${bundle.pools.for.install}" />
+			<arg value="-installIU" />
+			<arg value="${content.ius}" />
+			<arg value="-p2.os" />
+			<arg value="${wildcard}" />
+			<arg value="-p2.ws" />
+			<arg value="${wildcard}" />
+			<arg value="-p2.arch" />
+			<arg value="${wildcard}" />
+		</java>
+
+		<!-- remove the p2 metadata, as they will never be used -->
+		<delete dir="${install.destination}" includeEmptyDirs="true">
+			<include name="artifacts.xml" />
+			<include name="p2/**" />
+		</delete>
+
+		<property name="plugin.directory" location="${install.destination}/plugins" />
+		<property name="target.directory.name" value="${top.directory}/models" />
+		<property name="target.directory" location="${temp.directory}/${target.directory.name}" />
+
+		<property name="model.directory.name" value="model" />
+		<property name="cache.directory.name" value="cache" />
+		<property name="about.file.name" value="about.html" />
+
+		<delete dir="${target.directory}" />
+
+		<!--
+		  create a single directory corresponding to every bundle found in the plugins
+		  subdirectory of the previous install operation destination
+		  (handle both - the directory based and the jar based plugins)
 		-->
 		<touch mkdirs="true" verbose="false">
-			<fileset dir="${plugins.directory}">
-				<include name="*.jar" />
+			<fileset dir="${plugin.directory}">
+				<depth max="0" />
 				<type type="file" />
+				<filename name="*.jar" />
 			</fileset>
-			<globmapper from="*.jar" to="${models.directory}/*/${stamp.file.name}" />
+			<globmapper from="*.jar" to="${target.directory}/*/.stamp" />
 		</touch>
 		<touch mkdirs="true" verbose="false">
-			<fileset dir="${plugins.directory}">
-				<include name="*" />
+			<fileset dir="${plugin.directory}">
+				<depth max="0" />
 				<type type="dir" />
 			</fileset>
-			<globmapper from="*" to="${models.directory}/*/${stamp.file.name}" />
+			<globmapper from="*" to="${target.directory}/*/.stamp" />
 		</touch>
 
 		<!--
-			now call the "-extract.model.files" target for every subdirectory created
-			by the <touch> tasks above
+		  now call the "-extract.model.files" target for every directory created
+		  in the previous step
 		-->
 		<subant genericantfile="${ant.file}" target="-extract.model.files" inheritall="true">
-			<dirset dir="${models.directory}">
-				<include name="*" />
+			<dirset dir="${target.directory}">
+				<include name="*/**" />
 			</dirset>
 		</subant>
 
 		<!--
-			delete the .stamp files and also subdirectories which become empty as a result
-			(i.e. subdirectories corresponding to bundles containing no model files)
+		  delete any files other than those we want to keep, and delete also
+		  directories which become empty as a result of that action
 		-->
-		<delete dir="${models.directory}" includeemptydirs="true">
-			<include name="*/${stamp.file.name}" />
-			<include name="*" />
+		<delete dir="${target.directory}" includeemptydirs="true">
+			<filename name="**/*" />
+			<none>
+				<and>
+					<!--
+					  delete also the about files if not accompanied
+					  by either model or cache directories
+					-->
+					<filename name="*/${about.file.name}" />
+					<or>
+						<present targetdir="${target.directory}">
+							<mapper>
+								<globmapper from="*${about.file.name}" to="*${model.directory.name}" />
+							</mapper>
+						</present>
+						<present targetdir="${target.directory}">
+							<mapper>
+								<globmapper from="*${about.file.name}" to="*${cache.directory.name}" />
+							</mapper>
+						</present>
+					</or>
+				</and>
+				<filename name="*/${model.directory.name}/**" />
+				<filename name="*/${cache.directory.name}/**" />
+			</none>
 		</delete>
 
-		<zip destfile="${package.name.stem}.zip">
-			<zipfileset dir="${models.directory}" prefix="${top.directory}" />
-			<zipfileset refid="license.files" />
+		<!-- create the desired ZIP file -->
+		<zip basedir="${temp.directory}" destfile="${sp:output}/${package.name}${package.qualifier}.zip">
+			<include name="${target.directory.name}/**" />
 		</zip>
 
 		<!-- cleanup -->
-		<delete dir="${package.name.stem}" />
+		<delete dir="${temp.directory}" />
 	</target>
 
-	<target name="-define.plugin.properties">
+	<target name="-extract.model.files">
 		<pathconvert property="plugin.location.stem">
 			<path location="${basedir}" />
-			<map from="${models.directory}" to="${plugins.directory}" />
+			<map from="${target.directory}" to="${plugin.directory}" />
 		</pathconvert>
 		<property name="plugin.location" value="${plugin.location.stem}.jar" />
 
-		<available property="jar.based.plugin" file="${plugin.location}" type="file" />
-
-		<property name="about.file.name" value="about.html" />
-
 		<patternset id="model.files">
-			<include name="model/**" />
-			<include name="cache/**" />
 			<include name="${about.file.name}" />
+			<include name="${model.directory.name}/**" />
+			<include name="${cache.directory.name}/**" />
 		</patternset>
-	</target>
 
-	<target name="-define.zip.resource.set" depends="-define.plugin.properties" if="jar.based.plugin">
 		<!-- define a resource set for a jar file based plugin -->
-		<zipfileset id="model.files.resource.set" src="${plugin.location}">
+		<zipfileset id="zip.resource.set" src="${plugin.location}">
 			<patternset refid="model.files" />
 		</zipfileset>
-	</target>
 
-	<target name="-define.file.resource.set" depends="-define.plugin.properties" unless="jar.based.plugin">
 		<!-- define a resource set for a directory based plugin -->
-		<fileset id="model.files.resource.set" dir="${plugin.location.stem}">
+		<fileset id="file.resource.set" dir="${plugin.location.stem}">
 			<patternset refid="model.files" />
 		</fileset>
-	</target>
 
-	<target name="-define.model.files.resource.set" depends="-define.zip.resource.set,-define.file.resource.set">
-		<condition property="model.files.present">
-			<resourcecount when="greater" count="0">
-				<restrict>
-					<resources refid="model.files.resource.set" />
-					<not xmlns="antlib:org.apache.tools.ant.types.resources.selectors">
-						<name name="${about.file.name}" />
-					</not>
-				</restrict>
-			</resourcecount>
+		<!-- decide which resource set to use -->
+		<condition property="resource.set" value="zip.resource.set" else="file.resource.set">
+			<available file="${plugin.location}" type="file" />
 		</condition>
-	</target>
 
-	<target name="-extract.model.files" depends="-define.model.files.resource.set" if="model.files.present">
-		<!-- copy the model files -->
+		<!-- now copy the selected resources -->
 		<copy todir="${basedir}">
-			<resources refid="model.files.resource.set" />
+			<resources refid="${resource.set}" />
 		</copy>
 	</target>
 </project>

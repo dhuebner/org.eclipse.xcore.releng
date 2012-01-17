@@ -4,7 +4,12 @@
 	
 	<rm:locator pattern="^org\.eclipse\.emf\.xcore\.releng(?:\..+)?$" searchPathRef="releng" />
 	<rm:locator pattern="^org\.eclipse\.emf\.xcore\.build(?:\..+)?$" searchPathRef="releng" />
+	
+	<rm:locator pattern="org.eclipse.emf.license" searchPathRef="xcore" />
+
 	<rm:locator pattern="^org\.eclipse\.emf\.ecore\.xcore(?:\..+)?$" searchPathRef="xcore" />
+	<rm:locator pattern="^org\.eclipse\.emf\.codegen\.ecore\.xtext(?:\..+)?$" searchPathRef="xcore" />
+	
 	<rm:locator pattern="^org\.eclipse\.emf\.test\.ecore\.xcore(?:\..+)?$" searchPathRef="xcore.test" />
 	
 	<rm:locator pattern="^org\.eclipse\.test$" searchPathRef="eclipse.test" />
