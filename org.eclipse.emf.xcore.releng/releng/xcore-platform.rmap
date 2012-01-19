@@ -2,6 +2,7 @@
 <rm:rmap xmlns:bc="http://www.eclipse.org/buckminster/Common-1.0" xmlns:rm="http://www.eclipse.org/buckminster/RMap-1.0">
 	<rm:property key="checkout.location" value="${workspace.root}/org.eclipse.emf.xcore.releng/" />
 	<rm:property key="xtext.p2.repository" value="${eclipse.download}/modeling/tmf/xtext/updates/composite" />
+	<rm:property key="emf.p2.repository" value="${eclipse.download}/modeling/emf/emf/updates" />
 	
 	<!-- self -->
 	<rm:locator pattern="^org\.eclipse\.emf\.xcore\.releng$" searchPathRef="local.releng" />
@@ -43,21 +44,21 @@
 			readerType="p2" source="false" mutable="false"
 			resolutionFilter="(!(|(build.type=S)(build.type=R)))">
 			<rm:uri format="{0}/nightly">
-				<bc:propertyRef key="eclipse.download" />
+				<bc:propertyRef key="xtext.p2.repository" />
 			</rm:uri>
 		</rm:provider>
 		<rm:provider componentTypes="eclipse.feature,osgi.bundle"
 			readerType="p2" source="false" mutable="false"
 			resolutionFilter="(build.type=S)">
 			<rm:uri format="{0}/milestones">
-				<bc:propertyRef key="eclipse.download" />
+				<bc:propertyRef key="xtext.p2.repository" />
 			</rm:uri>
 		</rm:provider>
 		<rm:provider componentTypes="eclipse.feature,osgi.bundle"
 			readerType="p2" source="false" mutable="false"
 			resolutionFilter="(build.type=R)">
 			<rm:uri format="{0}/releases">
-				<bc:propertyRef key="eclipse.download" />
+				<bc:propertyRef key="xtext.p2.repository" />
 			</rm:uri>
 		</rm:provider>
 	</rm:searchPath>
@@ -66,22 +67,22 @@
 		<rm:provider componentTypes="eclipse.feature,osgi.bundle"
 			readerType="p2" source="false" mutable="false"
 			resolutionFilter="(!(|(build.type=S)(build.type=R)))">
-			<rm:uri format="{0}/modeling/emf/emf/updates/2.8-I-builds">
-				<bc:propertyRef key="eclipse.download" />
+			<rm:uri format="{0}/2.8-I-builds">
+				<bc:propertyRef key="emf.p2.repository" />
 			</rm:uri>
 		</rm:provider>
 		<rm:provider componentTypes="eclipse.feature,osgi.bundle"
 			readerType="p2" source="false" mutable="false"
 			resolutionFilter="(build.type=S)">
-			<rm:uri format="{0}/modeling/emf/emf/updates/2.8milestones">
-				<bc:propertyRef key="eclipse.download" />
+			<rm:uri format="{0}/2.8milestones">
+				<bc:propertyRef key="emf.p2.repository" />
 			</rm:uri>
 		</rm:provider>
 		<rm:provider componentTypes="eclipse.feature,osgi.bundle"
 			readerType="p2" source="false" mutable="false"
 			resolutionFilter="(build.type=R)">
-			<rm:uri format="{0}/modeling/emf/emf/updates/2.8">
-				<bc:propertyRef key="eclipse.download" />
+			<rm:uri format="{0}/2.8">
+				<bc:propertyRef key="emf.p2.repository" />
 			</rm:uri>
 		</rm:provider>
 	</rm:searchPath>

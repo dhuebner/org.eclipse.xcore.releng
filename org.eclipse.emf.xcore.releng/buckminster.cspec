@@ -13,12 +13,12 @@
 		<cs:dependency name="org.eclipse.platform" componentType="eclipse.feature" versionDesignator="[3.7.0,4.0.0)" />
 
 		<!--  EMF -->
-		<cs:dependency name="org.eclipse.emf.ecore" componentType="osgi.bundle"/>
+		<cs:dependency name="org.eclipse.emf.ecore" componentType="osgi.bundle" />
 		<cs:dependency name="org.eclipse.emf.ecore.edit" componentType="osgi.bundle" />
 		<cs:dependency name="org.eclipse.emf.ecore.editor" componentType="osgi.bundle" />
 		<cs:dependency name="org.eclipse.emf.codegen.ecore" componentType="osgi.bundle" />
 		<cs:dependency name="org.eclipse.emf.codegen.ecore.ui" componentType="osgi.bundle" />
-		<cs:dependency name="org.eclipse.emf.license" componentType="eclipse.feature" />
+		<cs:dependency name="org.eclipse.emf.license" componentType="eclipse.feature" versionDesignator="2.7.0"/>
 
 		<!-- xtext -->
 		<cs:dependency name="org.eclipse.xtext.ui" componentType="eclipse.feature" versionDesignator="2.3.0"/>
