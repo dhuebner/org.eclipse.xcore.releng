@@ -3,7 +3,7 @@
 	<target name="create.target.platform.metadata">
 		<buckminster.targetPlatformLocation property="target.platform.location" />
 		<property name="target.platform.repository" value="file:/${sp:output}" />
-		<p2.publish.featuresAndBundles metadataRepository="${target.platform.repository}" source="${target.platform.location}" publishArtifacts="false" />
+		<p2.publish.featuresAndBundles  metadataRepository="${target.platform.repository}" source="${target.platform.location}" publishArtifacts="false" />
 		<buckminster.publishJRE metadataRepository="${target.platform.repository}" publishArtifacts="false" />
 	</target>
 
@@ -45,7 +45,7 @@
 		<mkdir dir="${sp:output}" />
 		<!-- create the desired ZIP file -->
 		<zip basedir="${sp:repository}" destfile="${sp:output}/${package.name}${package.qualifier}.zip" />
-		<antcall target="-statistic.add" inheritall="true" />
+		<!--<antcall target="-statistic.add" inheritall="true" />-->
 	</target>
 
 
